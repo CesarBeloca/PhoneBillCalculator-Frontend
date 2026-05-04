@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Bill Calculator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: #f1f5f9;
+            padding: 2rem 1rem;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .badge {
+            background: #2B5E2B;
+            color: white;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 2rem;
+            vertical-align: middle;
+        }
+        .explanation {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 1rem;
+            margin: 1.5rem 0;
+            border-left: 4px solid #2B5E2B;
+        }
+        textarea {
+            width: 100%;
+            height: 250px;
+            font-family: 'Courier New', monospace;
+            padding: 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+            margin: 0.5rem 0 1rem 0;
+            resize: vertical;
+        }
+        button {
+            background: #2B5E2B;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 2rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 1rem;
+        }
+        button:hover { background: #1e421e; }
+        .result {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f1f5f9;
+            border-radius: 1rem;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        .error {
+            color: #dc2626;
+            background: #fee2e2;
+        }
+        footer {
+            margin-top: 2rem;
+            font-size: 0.75rem;
+            text-align: center;
+            color: #64748b;
+        }
+        pre {
+            background: #f1f5f9;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📞 Phone Bill Calculator <span class="badge">Spring Boot + REST API</span></h1>
+        <p>Calculate the total cost of a phone bill based on call logs.</p>
+
+        <div class="explanation">
+            <strong>📖 How it works</strong><br>
+            • Each call line format: <code>phoneNumber,startDateTime,endDateTime</code><br>
+            • Date format: <code>dd-MM-yyyy HH:mm:ss</code> (example: <code>01-01-2025 08:00:00</code>)<br>
+            • Peak hours: <strong>08:00 – 16:00</strong> → rate <strong>1.0 €/min</strong><br>
+            • Off‑peak hours → rate <strong>0.5 €/min</strong><br>
+            • First 5 minutes of each call are charged at the corresponding rate.<br>
+            • After 5 minutes, each additional minute costs <strong>0.2 €/min</strong> (flat discount rate).<br>
+            • The phone number with the highest call frequency gets <strong>all its calls for free</strong> (tie‑breaker: higher numeric value).<br>
+            • The total bill excludes all charges from the promo number.
+        </div>
+
+        <label for="phoneLog"><strong>📝 Phone Log (one call per line)</strong></label>
+        <textarea id="phoneLog" placeholder="Example:&#10;420123456789,01-01-2025 08:00:00,01-01-2025 08:10:00&#10;420987654321,01-01-2025 09:00:00,01-01-2025 09:03:00"></textarea>
+
+        <button onclick="calculateBill()">🧾 Calculate Bill</button>
+
+        <div id="result" class="result"></div>
+        <footer>
+            API backend: <span id="apiStatus">checking backend...</span>
+        </footer>
+    </div>
+
+    <script>
+        // Change this to your Render backend URL when deployed
+        const API_URL = 'http://localhost:8080/api/calculate';
+
+        async function calculateBill() {
+            const phoneLog = document.getElementById('phoneLog').value.trim();
+            const resultDiv = document.getElementById('result');
+
+            if (!phoneLog) {
+                resultDiv.innerHTML = '❌ Please enter a phone log.';
+                resultDiv.classList.add('error');
+                return;
+            }
+
+            resultDiv.innerHTML = '⏳ Calculating...';
+            resultDiv.classList.remove('error');
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneLog })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                resultDiv.innerHTML = `💰 Total bill: <strong>€${data.total.toFixed(2)}</strong>`;
+                resultDiv.classList.remove('error');
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Error: ${error.message}. Make sure the backend is running.`;
+                resultDiv.classList.add('error');
+            }
+        }
+
+        // Check if backend is reachable (optional)
+        async function checkBackend() {
+            const statusSpan = document.getElementById('apiStatus');
+            try {
+                // Simple OPTIONS or GET test
+                const response = await fetch(API_URL, { method: 'OPTIONS' });
+                if (response.ok) {
+                    statusSpan.innerHTML = '✅ connected (localhost:8080)';
+                    statusSpan.style.color = '#2B5E2B';
+                } else {
+                    throw new Error();
+                }
+            } catch (e) {
+                statusSpan.innerHTML = '⚠️ not reachable – start Spring Boot on port 8080';
+                statusSpan.style.color = '#dc2626';
+            }
+        }
+
+        checkBackend();
+    </script>
+</body>
+</html>
